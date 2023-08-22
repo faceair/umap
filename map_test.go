@@ -2,12 +2,13 @@ package umap
 
 import (
 	"math/rand"
+	"reflect"
 	"sort"
 	"testing"
 )
 
 func TestCorrectness(t *testing.T) {
-	m := New64(0)
+	m := New64[uint64](0)
 	if m.Len() != 0 {
 		t.Fatal()
 	}
@@ -71,7 +72,7 @@ func TestCorrectness(t *testing.T) {
 
 func TestStoreWithoutGrow(t *testing.T) {
 	for i := 0; i < 300; i++ {
-		m := New64(i)
+		m := New64[uint64](i)
 		initB := m.bucketmask
 		for j := 0; j < i; j++ {
 			m.Store(uint64(i), uint64(i))
@@ -82,16 +83,16 @@ func TestStoreWithoutGrow(t *testing.T) {
 	}
 }
 
-func assertHasValue(k, v uint64, t *testing.T, m *Uint64Map) {
+func assertHasValue[V any](k uint64, v V, t *testing.T, m *Uint64Map[V]) {
 	got, ok := m.Load(k)
-	if !ok || got != v {
+	if !ok || !reflect.DeepEqual(got, v) {
 		t.Errorf("key %v expected value %v, but got (%v,%v)", k, v, got, ok)
 	}
 }
 
 func TestSameKeyValue(t *testing.T) {
 	const count = 100000
-	m1 := New64(0)
+	m1 := New64[uint64](0)
 	m2 := make(map[uint64]uint64)
 	for i := 0; i < count; i++ {
 		choose := rand.Intn(100)
@@ -152,7 +153,7 @@ func TestSameKeyValue(t *testing.T) {
 
 func TestNeedBucket(t *testing.T) {
 	itemNeedBucket := func(length int) int {
-		m := New64(length)
+		m := New64[uint64](length)
 		return int(m.bucketmask) + 1
 	}
 
@@ -185,7 +186,7 @@ func TestSameSizeGrow(t *testing.T) {
 		v uint64
 	}
 	mcap := (bucketCnt - 1) * 16
-	m := New64(0)
+	m := New64[uint64](0)
 	for i := 0; i < 1000; i++ {
 		var addk []kv
 		for i := m.Len(); i < mcap; i++ {
@@ -212,7 +213,7 @@ func TestSameSizeGrow(t *testing.T) {
 }
 
 func TestRange(t *testing.T) {
-	m := New64(0)
+	m := New64[uint64](0)
 	for i := uint64(0); i < maxItemInBucket; i++ {
 		m.Store(i, i)
 	}
@@ -238,7 +239,7 @@ func TestRange(t *testing.T) {
 
 func TestFullBucket(t *testing.T) {
 	const bucketNum = 4
-	m := New64(maxItemInBucket * bucketNum)
+	m := New64[uint64](maxItemInBucket * bucketNum)
 
 	var toBucket0 []uint64
 	for i := uint64(0); len(toBucket0) < bucketNum*bucketCnt; i++ {

@@ -26,7 +26,7 @@ const (
 	maxItemInBucket   = bucketCnt - (bucketCnt >> loadFactorShift)
 )
 
-type Uint64Map struct {
+type Uint64Map[V any] struct {
 	count      int
 	growthLeft int
 	bucketmask uint64
@@ -34,20 +34,20 @@ type Uint64Map struct {
 }
 
 // bmapuint64 represents a bucket.
-type bmapuint64 struct {
+type bmapuint64[V any] struct {
 	tophash [bucketCnt]uint8
-	data    [bucketCnt]uint64kv
+	data    [bucketCnt]uint64kv[V]
 }
 
-type uint64kv struct {
+type uint64kv[V any] struct {
 	key   uint64
-	value uint64
+	value V
 }
 
 // New64 returns an empty Uint64Map.
 //
 // If length <= 0, it returns an empty map(including a pre-allocated bucket).
-func New64(length int) *Uint64Map {
+func New64[V any](length int) *Uint64Map[V] {
 	// Make sure the compiler can inline New64(cost < 80).
 	bucketnum := uint(1)
 
@@ -60,19 +60,19 @@ func New64(length int) *Uint64Map {
 		bucketnum = minBucket
 	}
 
-	x := make([]bmapuint64, bucketnum)
+	x := make([]bmapuint64[V], bucketnum)
 	for i := range x {
 		*(*uint64)(unsafe.Pointer(&x[i].tophash)) = allEmpty
 	}
 
-	return &Uint64Map{
+	return &Uint64Map[V]{
 		buckets:    (*sliceHeader)(unsafe.Pointer(&x)).Data,
 		bucketmask: uint64(bucketnum) - 1,
 		growthLeft: int(bucketnum * bucketCnt),
 	}
 }
 
-func (h *Uint64Map) Load(key uint64) (value uint64, ok bool) {
+func (h *Uint64Map[V]) Load(key uint64) (value V, ok bool) {
 	hashres := hashUint64(uint64(key))
 	tophash := tophash(hashres)
 
@@ -81,7 +81,7 @@ func (h *Uint64Map) Load(key uint64) (value uint64, ok bool) {
 	indexStride := uint64(0)
 
 	for {
-		bucket := bmapPointer(h.buckets, uint(index))
+		bucket := bmapPointer[V](h.buckets, uint(index))
 		status := matchTopHash(bucket.tophash, tophash)
 		for {
 			sloti := status.NextMatch()
@@ -104,7 +104,7 @@ func (h *Uint64Map) Load(key uint64) (value uint64, ok bool) {
 }
 
 // Store sets the value for a key.
-func (h *Uint64Map) Store(key uint64, value uint64) {
+func (h *Uint64Map[V]) Store(key uint64, value V) {
 	if h.needGrow() {
 		h.growWork()
 	}
@@ -117,12 +117,12 @@ func (h *Uint64Map) Store(key uint64, value uint64) {
 	indexStride := uint64(0)
 
 	var (
-		bucket *bmapuint64
+		bucket *bmapuint64[V]
 		status bitmask64
 	)
 	// Check if the key is in the map.
 	for {
-		bucket = bmapPointer(h.buckets, uint(index))
+		bucket = bmapPointer[V](h.buckets, uint(index))
 		status = matchTopHash(bucket.tophash, tophash)
 		for {
 			sloti := status.NextMatch()
@@ -149,7 +149,7 @@ func (h *Uint64Map) Store(key uint64, value uint64) {
 	index = hashres & indexMask
 	indexStride = 0
 	for {
-		bucket = bmapPointer(h.buckets, uint(index))
+		bucket = bmapPointer[V](h.buckets, uint(index))
 		// Can't find the key in this bucket.
 		// Check empty slot or deleted slot.
 		status = bucket.MatchEmptyOrDeleted()
@@ -174,7 +174,7 @@ func (h *Uint64Map) Store(key uint64, value uint64) {
 // This function also assumes that
 // - There are always enough empty slots in the hashmap.
 // - No deleted slots in the hashmap. (not used for now)
-func (h *Uint64Map) storeWithoutGrow(key uint64, value uint64) {
+func (h *Uint64Map[V]) storeWithoutGrow(key uint64, value V) {
 	hashres := hashUint64(uint64(key))
 	tophash := tophash(hashres)
 
@@ -183,7 +183,7 @@ func (h *Uint64Map) storeWithoutGrow(key uint64, value uint64) {
 	indexStride := uint64(0)
 
 	for {
-		bucket := bmapPointer(h.buckets, uint(index))
+		bucket := bmapPointer[V](h.buckets, uint(index))
 		// Just checking the empty slot is fine, but using this function is faster.
 		status := bucket.MatchEmptyOrDeleted()
 		sloti := status.NextMatch()
@@ -201,7 +201,7 @@ func (h *Uint64Map) storeWithoutGrow(key uint64, value uint64) {
 }
 
 // Delete deletes the value for a key.
-func (h *Uint64Map) Delete(key uint64) {
+func (h *Uint64Map[V]) Delete(key uint64) {
 	hashres := hashUint64(uint64(key))
 	tophash := tophash(hashres)
 
@@ -210,7 +210,7 @@ func (h *Uint64Map) Delete(key uint64) {
 	indexStride := uint64(0)
 
 	for {
-		bucket := bmapPointer(h.buckets, uint(index))
+		bucket := bmapPointer[V](h.buckets, uint(index))
 		status := matchTopHash(bucket.tophash, tophash)
 		for {
 			sloti := status.NextMatch()
@@ -243,7 +243,7 @@ func (h *Uint64Map) Delete(key uint64) {
 
 // Range calls f sequentially for each key and value present in the map.
 // If f returns false, range stops the iteration.
-func (h *Uint64Map) Range(f func(k uint64, v uint64) bool) {
+func (h *Uint64Map[V]) Range(f func(k uint64, v V) bool) {
 	initBuckets := h.buckets
 	bucketNum := int(h.bucketmask + 1)
 
@@ -252,7 +252,7 @@ func (h *Uint64Map) Range(f func(k uint64, v uint64) bool) {
 	indexStride := uint64(0)
 
 	for indexStride < uint64(bucketNum) {
-		bucket := bmapPointer(initBuckets, uint(index))
+		bucket := bmapPointer[V](initBuckets, uint(index))
 		for sloti := 0; sloti < bucketCnt; sloti++ {
 			if isDeletedOrEmpty(bucket.tophash[sloti]) {
 				continue
@@ -272,11 +272,11 @@ func (h *Uint64Map) Range(f func(k uint64, v uint64) bool) {
 }
 
 // Len returns the length of the hashmap.
-func (h *Uint64Map) Len() int {
+func (h *Uint64Map[V]) Len() int {
 	return int(h.count)
 }
 
-func (h *Uint64Map) growWork() {
+func (h *Uint64Map[V]) growWork() {
 	oldCap := (h.bucketmask + 1) * bucketCnt
 	if uint64(h.count) < oldCap>>1 {
 		// Too many slots are locked by deleted items.
@@ -286,7 +286,7 @@ func (h *Uint64Map) growWork() {
 	}
 }
 
-func (h *Uint64Map) sameSizeGrow() {
+func (h *Uint64Map[V]) sameSizeGrow() {
 	// Algorithm:
 	// - mark all DELETED slots as EMPTY
 	// - mark all FULL slots as DELETED
@@ -307,11 +307,11 @@ func (h *Uint64Map) sameSizeGrow() {
 
 	bucketNum := uint(h.bucketmask + 1)
 	for index := uint(0); index < bucketNum; index++ {
-		bucket := bmapPointer(h.buckets, uint(index))
+		bucket := bmapPointer[V](h.buckets, uint(index))
 		bucket.PrepareSameSizeGrow()
 	}
 	for index := uint(0); index < bucketNum; index++ {
-		bucket := bmapPointer(h.buckets, uint(index))
+		bucket := bmapPointer[V](h.buckets, uint(index))
 
 		for sloti := uint(0); sloti < bucketCnt; {
 			if bucket.tophash[sloti] != deletedSlot {
@@ -350,13 +350,13 @@ func (h *Uint64Map) sameSizeGrow() {
 	h.growthLeft = int(bucketNum*bucketCnt) - h.count
 }
 
-func (h *Uint64Map) findFirstNotNull(hashres uint64) (bucket *bmapuint64, bucketi, sloti uint) {
+func (h *Uint64Map[V]) findFirstNotNull(hashres uint64) (bucket *bmapuint64[V], bucketi, sloti uint) {
 	indexMask := uint64(h.bucketmask)
 	index := hashres & indexMask
 	indexStride := uint64(0)
 
 	for {
-		bucket := bmapPointer(h.buckets, uint(index))
+		bucket := bmapPointer[V](h.buckets, uint(index))
 		status := bucket.MatchEmptyOrDeleted()
 		sloti := status.NextMatch()
 		if sloti < bucketCnt {
@@ -369,18 +369,18 @@ func (h *Uint64Map) findFirstNotNull(hashres uint64) (bucket *bmapuint64, bucket
 	}
 }
 
-func (h *Uint64Map) grow() {
+func (h *Uint64Map[V]) grow() {
 	oldBucketnum := h.bucketmask + 1
 	newBucketnum := oldBucketnum * 2
 	newBucketMask := newBucketnum - 1
 	newCap := newBucketnum * bucketCnt
-	newMap := &Uint64Map{
-		buckets:    makeUint64BucketArray(int(newBucketnum)),
+	newMap := &Uint64Map[V]{
+		buckets:    makeUint64BucketArray[V](int(newBucketnum)),
 		bucketmask: newBucketMask,
 	}
 
 	for index := uint64(0); index < oldBucketnum; index++ {
-		bucket := bmapPointer(h.buckets, uint(index))
+		bucket := bmapPointer[V](h.buckets, uint(index))
 		for i := 0; i < bucketCnt; i++ {
 			if isFull(bucket.tophash[i]) {
 				kv := bucket.data[i]
@@ -395,7 +395,7 @@ func (h *Uint64Map) grow() {
 	h.growthLeft = int(newCap) - h.count
 }
 
-func (h *Uint64Map) needGrow() bool {
+func (h *Uint64Map[V]) needGrow() bool {
 	return h.growthLeft <= growThresholdUint64(h.bucketmask)
 }
 

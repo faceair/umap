@@ -61,7 +61,7 @@ func BenchmarkMapAssignReuse(b *testing.B) {
 }
 
 func benchmarkMapAccessHitUint64(b *testing.B, n int) {
-	m := New64(0)
+	m := New64[uint64](0)
 	for i := 0; i < n; i++ {
 		m.Store(uint64(i), uint64(i))
 	}
@@ -73,7 +73,7 @@ func benchmarkMapAccessHitUint64(b *testing.B, n int) {
 
 func benchmarkMapAssignGrowUint64(b *testing.B, n int) {
 	for i := 0; i < b.N; i++ {
-		m := New64(0)
+		m := New64[uint64](0)
 		for j := uint64(0); int(j) < n; j++ {
 			m.Store(j, j)
 		}
@@ -83,7 +83,7 @@ func benchmarkMapAssignGrowUint64(b *testing.B, n int) {
 var rangecount uint64
 
 func benchmarkMapRangeUint64(b *testing.B, n int) {
-	m := New64(0)
+	m := New64[uint64](0)
 	for i := 0; i < n; i++ {
 		m.Store(uint64(i), uint64(i))
 	}
@@ -98,7 +98,7 @@ func benchmarkMapRangeUint64(b *testing.B, n int) {
 }
 
 func benchmarkMapAssignReuseUint64(b *testing.B, n int) {
-	m := New64(0)
+	m := New64[uint64](0)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for j := uint64(0); int(j) < n; j++ {

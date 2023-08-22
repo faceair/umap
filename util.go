@@ -9,8 +9,8 @@ import (
 // It is also the size of the machine's native word size (that is, 4 on 32-bit systems, 8 on 64-bit).
 const ptrSize = 4 << (^uintptr(0) >> 63)
 
-func bmapPointer(p unsafe.Pointer, n uint) *bmapuint64 {
-	return (*bmapuint64)(add(p, unsafe.Sizeof(bmapuint64{})*uintptr(n)))
+func bmapPointer[V any](p unsafe.Pointer, n uint) *bmapuint64[V] {
+	return (*bmapuint64[V])(add(p, unsafe.Sizeof(bmapuint64[V]{})*uintptr(n)))
 }
 
 func nextPowerOfTwo(length int) uint {

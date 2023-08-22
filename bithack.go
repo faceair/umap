@@ -13,8 +13,8 @@ type sliceHeader struct {
 	Data unsafe.Pointer
 }
 
-func makeUint64BucketArray(size int) unsafe.Pointer {
-	x := make([]bmapuint64, size)
+func makeUint64BucketArray[V any](size int) unsafe.Pointer {
+	x := make([]bmapuint64[V], size)
 	for i := range x {
 		*(*uint64)(unsafe.Pointer(&x[i].tophash)) = allEmpty
 	}
@@ -58,15 +58,15 @@ func prepareSameSizeGrow(tophash [bucketCnt]uint8) [bucketCnt]uint8 {
 	return littleEndianUint64ToBytes(full)
 }
 
-func (b *bmapuint64) MatchEmptyOrDeleted() bitmask64 {
+func (b *bmapuint64[V]) MatchEmptyOrDeleted() bitmask64 {
 	return matchEmptyOrDeleted(b.tophash)
 }
 
-func (b *bmapuint64) MatchEmpty() bitmask64 {
+func (b *bmapuint64[V]) MatchEmpty() bitmask64 {
 	return matchEmpty(b.tophash)
 }
 
-func (b *bmapuint64) PrepareSameSizeGrow() {
+func (b *bmapuint64[V]) PrepareSameSizeGrow() {
 	b.tophash = prepareSameSizeGrow(b.tophash)
 }
 
